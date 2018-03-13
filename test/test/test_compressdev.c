@@ -14,7 +14,7 @@
 #include "test_compressdev_test_buffer.h"
 #include "test.h"
 
-#define DEFAULT_WINDOW_SIZE 32768
+#define DEFAULT_WINDOW_SIZE 15
 #define DEFAULT_MEM_LEVEL 8
 
 /*
@@ -253,7 +253,7 @@ compress_zlib(struct rte_comp_op *op,
 	 * Window bits is the base two logarithm of the window size (in bytes).
 	 * When doing raw DEFLATE, this number will be negative.
 	 */
-	window_bits = -log2(xform->window_size);
+	window_bits = -(xform->window_size);
 
 	comp_level = xform->level;
 
@@ -318,7 +318,7 @@ decompress_zlib(struct rte_comp_op *op,
 	 * Window bits is the base two logarithm of the window size (in bytes).
 	 * When doing raw DEFLATE, this number will be negative.
 	 */
-	window_bits = -log2(xform->window_size);
+	window_bits = -(xform->window_size);
 
 	ret = inflateInit2(&stream, window_bits);
 
