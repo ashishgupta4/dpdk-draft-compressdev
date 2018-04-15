@@ -21,6 +21,7 @@ Programmer's Guide
     traffic_management
     bbdev
     cryptodev_lib
+    compressdev_lib
     rte_security
     rawdev
     link_bonding_poll_mode_drv_lib
