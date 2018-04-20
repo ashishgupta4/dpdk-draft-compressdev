@@ -15,11 +15,11 @@ Device Management
 Device Creation
 ~~~~~~~~~~~~~~~
 
-Physical compression devices are discovered during the PCI probe/enumeration of the
-EAL function which is executed at DPDK initialization, based on their unique PCI device
-identifier PCI BDF (bus/bridge, device, function). Specific physical
-compression devices, like other physical devices in DPDK can be white-listed or
-black-listed using the EAL command line options.
+Physical compression devices are discovered during the bus probe of the EAL function
+which is executed at DPDK initialization, based on their unique device identifier.
+For eg. PCI devices can be identified using PCI BDF (bus/bridge, device, function).
+Specific physical compression devices, like other physical devices in DPDK can be
+white-listed or black-listed using the EAL command line options.
 
 Virtual devices can be created by two mechanisms, either using the EAL command
 line options or from within the application using an EAL API directly.
@@ -35,9 +35,10 @@ From the command line using the --vdev EAL option
    * If DPDK application requires multiple software compression PMD devices then required
      number of ``--vdev`` with appropriate libraries are to be added.
 
-   * An Application with compression PMD instaces sharing the same library requires unique ID.
+   * An Application with multiple compression device instances exposed by the same PMD must
+     specify a unique name for each device.
 
-   Example: ``--vdev  'compress_zlib0' --vdev  'compress_zlib1'``
+   Example: ``--vdev  'pmd0' --vdev  'pmd1'``
 
 Or, by using the rte_vdev_init API within the application code.
 
@@ -114,11 +115,11 @@ Logical Cores, Memory and Queues Pair Relationships
 
 Library supports NUMA similarly as described in Cryptodev library section.
 
-Multiple logical cores should never share the same queue pair for enqueuing
-operations or dequeuing operations on the same compression device since this would
-require global locks and hinder performance. It is however possible to use a
-different logical core to dequeue an operation on a queue pair from the logical
-core which it was enqueued on. This means that a compression burst enqueue/dequeue
+A queue pair cannot be shared and should be exclusively used by a single processing
+context for enqueuing operations or dequeuing operations on the same compression device
+since sharing would require global locks and hinder performance. It is however possible
+to use a different logical core to dequeue an operation on a queue pair from the logical
+core on which it was enqueued. This means that a compression burst enqueue/dequeue
 APIs are a logical place to transition from one logical core to another in a
 data processing pipeline.
 
@@ -128,37 +129,12 @@ Device Features and Capabilities
 Compression devices define their functionality through two mechanisms, global device
 features and algorithm features. Global devices features identify device
 wide level features which are applicable to the whole device such as supported hardware
-acceleration and compression algorithms.
+acceleration and CPU features. List of compression device features can be seen in the
+RTE_COMPDEV_FF_XXX macros.
 
-The algorithm features lists individual algo feature which device supports,
-such as a stateful compression/decompression, checksums operation etc.
-
-Device Features
-~~~~~~~~~~~~~~~
-
-Following are current Compression device feature flags:
-
-* SSE accelerated SIMD vector operations
-* AVX accelerated SIMD vector operations
-* AVX2 accelerated SIMD vector operations
-* AVX512 accelerated SIMD vector operations
-* NEON accelerated SIMD vector operations
-* Hardware off-load processing
-
-Algorithm Features
-~~~~~~~~~~~~~~~~~~
-
-Following are current compression algorithms feature flags:
-
-* Stateful Compression
-* Stateful Decompression
-* Scatter-Gather input/output
-* Adler32 checksum generation
-* CRC32 checksum generation
-* Adler32 and CRC32 checksum generation
-* Uncompressed blocks generation
-* SHA1 and SHA2-256 hash digest calculation on plaintext
-* Shareable priv_xform support for stateless operations
+The algorithm features lists individual algo feature which device supports per-algorithm,
+such as a stateful compression/decompression, checksums operation etc. List of algorithm
+features can be seen in the RTE_COMP_FF_XXX macros.
 
 Capabilities
 ~~~~~~~~~~~~
@@ -220,7 +196,6 @@ The ``rte_compressdev_info`` structure contains all the relevant information for
 		const struct rte_compressdev_capabilities *capabilities;
 		/**< Array of devices supported capabilities */
 		uint16_t max_nb_queue_pairs;
-		/**< Maximum number of queues pairs supported by device. */
 		/**< Maximum number of queues pairs supported by device.
 		* (If 0, there is no limit in maximum number of queue pairs)
 		*/
@@ -231,136 +206,29 @@ Compression Operation
 
 DPDK compression supports two types of compression methodologies:
 
-- Stateless, each data object is compressed individually without any reference to previous data
+- Stateless, data associated to a compression operation is compressed without any reference
+  to another compression operation.
 
-- Stateful, each data object is compressed with reference to previous data object i.e. history of data is needed for compression / decompression.
+- Stateful, data in each compression operation is compressed with reference to previous compression
+  operations in the same data stream i.e. history of data is maintained between the operations.
 
 For more explanation, please refer RFC https://www.ietf.org/rfc/rfc1951.txt
 
 Operation Representation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Compression operation is described via ``struct rte_comp_op``. The operation structure
-includes the operation type (stateless or stateful), the operation status
-and the priv_xform/stream handle, source, destination and checksum buffer
-pointers. It also contains the source mempool for the operation are allocated
-from. PMD consumes the input as mentioned in consumed field and update
-produced with amount of data of written into destination buffer along with
+Compression operation is described via ``struct rte_comp_op``, which contains both input and
+output data. The operation structure includes the operation type (stateless or stateful),
+the operation status and the priv_xform/stream handle, source, destination and checksum buffer
+pointers. It also contains the source mempool from which the operation is allocated.
+PMD updates consumed field with amount of data read from source buffer and produced
+field with amount of data of written into destination buffer along with
 status of operation.
 
 Compression operations mempool also has an ability to allocate private memory with the
-operation for applications purposes. Application software is responsible for specifying
+operation for application's purposes. Application software is responsible for specifying
 all the operation specific fields in the ``rte_comp_op`` structure which are then used
 by the compression PMD to process the requested operation.
-
-.. code-block:: c
-
-	struct rte_comp_op {
-
-		enum rte_comp_op_type op_type;
-		union {
-			void *private_xform;
-			/**< Stateless private PMD data derived from an rte_comp_xform.
-			 * A handle returned by rte_compressdev_private_xform_create()
-			 * must be attached to operations of op_type RTE_COMP_STATELESS.
-			 */
-			void *stream;
-			/**< Private PMD data derived initially from an rte_comp_xform,
-			 * which holds state and history data and evolves as operations
-			 * are processed. rte_compressdev_stream_create() must be called
-			 * on a device for all STATEFUL data streams and the resulting
-			 * stream attached to the one or more operations associated
-			 * with the data stream.
-			 * All operations in a stream must be sent to the same device.
-			 */
-		};
-
-		struct rte_mempool *mempool;
-		/**< Pool from which operation is allocated */
-		rte_iova_t iova_addr;
-		/**< IOVA address of this operation */
-		struct rte_mbuf *m_src;
-		/**< source mbuf
-		 * The total size of the input buffer(s) can be retrieved using
-		 * rte_pktmbuf_data_len(m_src)
-		 */
-		struct rte_mbuf *m_dst;
-		/**< destination mbuf
-		 * The total size of the output buffer(s) can be retrieved using
-		 * rte_pktmbuf_data_len(m_dst)
-		 */
-
-		struct {
-			uint32_t offset;
-			/**< Starting point for compression or decompression,
-			 * specified as number of bytes from start of packet in
-			 * source buffer.
-			 * Starting point for checksum generation in compress direction.
-			 */
-			uint32_t length;
-			/**< The length, in bytes, of the data in source buffer
-			 * to be compressed or decompressed.
-			 * Also the length of the data over which the checksum
-			 * should be generated in compress direction
-			 */
-		} src;
-		struct {
-			uint32_t offset;
-			/**< Starting point for writing output data, specified as
-			 * number of bytes from start of packet in dest
-			 * buffer. Starting point for checksum generation in
-			 * decompress direction.
-			 */
-		} dst;
-		struct {
-			uint8_t *digest;
-			/**< Output buffer to store hash output, if enabled in xform.
-			 * Buffer would contain valid value only after an op with
-			 * flush flag = RTE_COMP_FLUSH_FULL/FLUSH_FINAL is processed
-			 * successfully.
-			 *
-			 * Length of buffer should be contiguous and large enough to
-			 * accommodate digest produced by specific hash algo.
-			 */
-			rte_iova_t iova_addr;
-			/**< IO address of the buffer */
-		} hash;
-		enum rte_comp_flush_flag flush_flag;
-		/**< Defines flush characteristics for the output data.
-		 * Only applicable in compress direction
-		 */
-		uint64_t input_chksum;
-		/**< An input checksum can be provided to generate a
-		 * cumulative checksum across sequential blocks in a STATELESS stream.
-		 * Checksum type is as specified in xform chksum_type
-		 */
-		uint64_t output_chksum;
-		/**< If a checksum is generated it will be written in here.
-		 * Checksum type is as specified in xform chksum_type.
-		 */
-		uint32_t consumed;
-		/**< The number of bytes from the source buffer
-		 * which were compressed/decompressed.
-		 */
-		uint32_t produced;
-		/**< The number of bytes written to the destination buffer
-		 * which were compressed/decompressed.
-		 */
-		uint64_t debug_status;
-		/**<
-		 * Status of the operation is returned in the status param.
-		 * This field allows the PMD to pass back extra
-		 * pmd-specific debug information. Value is not defined on the API.
-		 */
-		uint8_t status;
-		/**<
-		 * Operation status - use values from enum rte_comp_status.
-		 * This is reset to
-		 * RTE_COMP_OP_STATUS_NOT_PROCESSED on allocation from mempool and
-		 * will be set to RTE_COMP_OP_STATUS_SUCCESS after operation
-		 * is successfully processed by a PMD
-		 */
-	} __rte_cache_aligned;
 
 
 Operation Management and Allocation
@@ -447,8 +315,9 @@ Produced, Consumed And Operation Status
 	consumed = produced = 0 or undefined
 - If status is RTE_COMP_OP_STATUS_OUT_OF_SPACE_TERMINATED,
 	consumed = 0 and
-	produced = amount of data successfully produced until
-	out of space condition hit.	Application can consume output data, if required.
+	produced = usually 0, but in decompression cases a PMD may return > 0
+        i.e. amount of data successfully produced until out of space condition
+        hit. Application can consume output data in this case, if required.
 - If status is RTE_COMP_OP_STATUS_OUT_OF_SPACE_RECOVERABLE,
 	consumed = amount of data read, and
 	produced = amount of data successfully produced until
@@ -529,9 +398,9 @@ priv_xform in Stateless operation
 
 priv_xform is PMD internally managed private data that it maintains to do stateless processing.
 priv_xforms are initialized provided a generic xform structure by an application via making call
-to ``rte_comp_priv_xform_create``, at an output PMD returns an opaque priv_xform reference with
-flag set to SHAREABLE or NON_SHAREABLE. If PMD support SHAREABLE priv_xform, then application
-can attach same priv_xform with many stateless ops at-a-time. If not, then application needs to
+to ``rte_comp_private_xform_create``, at an output PMD returns an opaque priv_xform reference.
+If PMD support SHAREABLE priv_xform indicated via algorithm feature flag, then application can
+attach same priv_xform with many stateless ops at-a-time. If not, then application needs to
 create as many priv_xforms as it expects to have stateless operations in-flight.
 
 .. figure:: img/stateless-op.png
@@ -540,7 +409,7 @@ create as many priv_xforms as it expects to have stateless operations in-flight.
 
 
 Application should call ``rte_compressdev_private_xform_create()`` and attach to stateless op before
-engueing them for processing and free via ``rte_compressdev_private_xform_free()`` during termmination.
+enqueuing them for processing and free via ``rte_compressdev_private_xform_free()`` during termination.
 
 .. code-block:: c
 
@@ -595,7 +464,7 @@ using shareable priv_xform would look like:
 
 	/* Get a burst of operations. */
     struct rte_comp_op *comp_ops[CHUNK_LEN];
-    if (rte_comp_op_bulk_alloc(op_pool, comp_ops, OP_LEN) == 0)
+    if (rte_comp_op_bulk_alloc(op_pool, comp_ops, NUM_OPS) == 0)
         rte_exit(EXIT_FAILURE, "Not enough compression operations available\n");
 
     /* Get a burst of src and dst mbufs. */
@@ -648,6 +517,11 @@ Hash in Stateless
 If hash is enabled, digest buffer will contain valid data after op is successfully
 processed i.e. dequeued with status = RTE_COMP_OP_STATUS_SUCCESS.
 
+Checksum in Stateless
+~~~~~~~~~~~~~~~~~
+If checksum is enabled, checksum will only be available after op is successfully
+processed i.e. dequeued with status = RTE_COMP_OP_STATUS_SUCCESS.
+
 Compression API Stateful operation
 -----------------------------------
 
@@ -668,7 +542,7 @@ In case of either one or all of the above conditions, PMD initiates
 stateful processing and releases acquired resources after processing
 operation with flush value = RTE_COMP_FLUSH_FULL/FINAL is complete.
 Unlike stateless, application can enqueue only one stateful op from
-a particular stream in a single burst and must attach stream handle
+a particular stream at a time and must attach stream handle
 to each op.
 
 Stream in Stateful operation
@@ -819,13 +693,15 @@ enqueue call.
 
 A burst in DPDK compression can be a combination of stateless and stateful operations with a condition
 that for stateful ops only one op at-a-time should be enqueued from a particular stream i.e. no-two ops
-should belong to same stream in a single burst i.e. a burst can look like:
+should belong to same stream in a single burst. However a burst may contain multiple stateful ops as long
+as each op is attached to a different stream i.e. a burst can look like:
 
 +--------------+-------------+--------------+-----------------+--------------+--------------+
 |enqueue_burst |op1.no_flush | op2.no_flush | op3.flush_final | op4.no_flush | op5.no_flush |
 +--------------+-------------+--------------+-----------------+---------------+-------------+
 
-Where, op1 .. op5 all belong to different independent data units and can be of type : stateless or stateful.
+Where, op1 .. op5 all belong to different independent data units. op1, op2, op4, op5 must be stateful
+as stateless ops can only use flush full or final and op3 can be of type stateless or stateful.
 Every op with type set to RTE_COMP_OP_TYPE_STATELESS must be attached to priv_xform and
 Every op with type set to RTE_COMP_OP_TYPE_STATEFUL *must* be attached to stream.
 
@@ -1007,7 +883,7 @@ using deflate, using one of the sudo compress PMDs available in DPDK.
 			rte_compressdev_private_xform_create(cdev_id, &compress_xform, &op->private_xform);
 		} else {
 			/* Attach the priv_xform to the operation */
-			op->priv_xform = priv_xform;
+			op->private_xform = priv_xform;
 		}
 		op->src.offset = 0;
 		op->src.length = BUFFER_SIZE;
