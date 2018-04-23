@@ -73,26 +73,10 @@ The configuration of each compression device includes the following operations:
 
 The ``rte_compressdev_configure`` API is used to configure a compression device.
 
-.. code-block:: c
-
-   int rte_compressdev_configure(uint8_t dev_id,
-                               struct rte_compressdev_config *config)
-
 The ``rte_compressdev_config`` structure is used to pass the configuration
 parameters for socket selection and number of queue pairs.
 
-.. code-block:: c
-
-    struct rte_compressdev_config {
-		int socket_id;
-		/**< Socket on which to allocate resources */
-		uint16_t nb_queue_pairs;
-		/**< Total number of queue pairs to configure on a device */
-		uint16_t max_nb_priv_xforms;
-		/**< Max number of private_xforms which will be created on the device */
-		uint16_t max_nb_streams;
-		/**< Max number of streams which will be created on the device */
-	};
+See *DPDK API Reference* for details.
 
 Configuration of Queue Pairs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,15 +84,11 @@ Configuration of Queue Pairs
 Each compression device queue pair is individually configured through the
 ``rte_compressdev_queue_pair_setup`` API.
 
-.. code-block:: c
-
-    int __rte_experimental
-	rte_compressdev_queue_pair_setup(uint8_t dev_id, uint16_t queue_pair_id,
-								uint32_t max_inflight_ops, int socket_id);
-
 The ``max_inflight_ops`` is used to pass maximum number of
 rte_comp_op that could be present in a queue at-a-time.
 PMD then can allocate resources accordingly on a specified socket.
+
+See *DPDK API Reference* for details.
 
 Logical Cores, Memory and Queues Pair Relationships
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -144,19 +124,7 @@ sliding window range in log base 2 value. Sliding window tells
 the minimum and maximum size of lookup window that algorithm uses
 to find duplicates.
 
-See definition of compression device capability structure in the
-*DPDK API Reference*.
-
-.. code-block:: c
-
-	struct rte_compressdev_capabilities {
-		enum rte_comp_algorithm algo;
-		/* Compression algorithm */
-		uint64_t comp_feature_flags;
-		/**< Bitmask of flags for compression service features */
-		struct rte_param_log2_range window_size;
-		/**< Window size range in base two log byte values */
-	};
+See *DPDK API Reference* for details.
 
 Each Compression poll mode driver defines its array of capabilities
 for each algorithm it supports. Below is an example of PMD capabilities which supports
@@ -181,25 +149,9 @@ Capabilities Discovery
 
 PMD capability and features are discovered via ``rte_compressdev_info_get`` function.
 
-.. code-block:: c
-
-   void rte_compressdev_info_get(uint8_t dev_id,
-                               struct rte_compressdev_info *dev_info);
-
 The ``rte_compressdev_info`` structure contains all the relevant information for the device.
 
-.. code-block:: c
-
-	struct rte_compressdev_info {
-		const char *driver_name;		/**< Driver name. */
-		uint64_t feature_flags;			/**< Feature flags */
-		const struct rte_compressdev_capabilities *capabilities;
-		/**< Array of devices supported capabilities */
-		uint16_t max_nb_queue_pairs;
-		/**< Maximum number of queues pairs supported by device.
-		* (If 0, there is no limit in maximum number of queue pairs)
-		*/
-	};
+See *DPDK API Reference* for details.
 
 Compression Operation
 ----------------------
@@ -238,34 +190,19 @@ The compressdev library provides an API set for managing compression operations 
 utilize the Mempool Library to allocate operation buffers. Therefore, it ensures
 that the compression operation is interleaved optimally across the channels and
 ranks for optimal processing.
+
 A ``rte_comp_op`` contains a field indicating the pool that it originated from.
 When calling ``rte_comp_op_free(op)``, the operation returns to its original pool.
-
-.. code-block:: c
-
-   struct rte_mempool *rte_comp_op_pool_create(const char *name,
-						unsigned int nb_elts, unsigned int cache_size,
-						uint16_t user_size, int socket_id);
-
 
 ``rte_comp_op_alloc()`` and ``rte_comp_op_bulk_alloc()`` are used to allocate
 compression operations from a given compression operation mempool.
 The operation gets reset before being returned to a user so that operation
 is always in a good known state before use by the application.
 
-.. code-block:: c
-
-	struct rte_comp_op *rte_comp_op_alloc(struct rte_mempool *mempool)
-
-	int rte_comp_op_bulk_alloc(struct rte_mempool *mempool,
-					struct rte_comp_op **ops, uint16_t nb_ops)
-
 ``rte_comp_op_free()`` is called by the application to return an operation to
 its allocating pool.
 
-.. code-block:: c
-
-   void rte_comp_op_free(struct rte_comp_op *op)
+See *DPDK API Reference* for details.
 
 Passing source data as mbuf-chain
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -332,21 +269,6 @@ Compression transforms (``rte_comp_xform``) are the mechanism
 to specify the details of the compression operation.
 Currently chaining is not supported on compression API.
 
-.. code-block:: c
-
-	struct rte_comp_xform {
-		struct rte_comp_xform *next;
-		/**< next xform in chain */
-		enum rte_comp_xform_type type;
-		/**< xform type */
-		union {
-			struct rte_comp_compress_xform compress;
-			/**< xform for compress operation */
-			struct rte_comp_decompress_xform decompress;
-			/**< decompress xform */
-		};
-	};
-
 Compression API Hash support
 ----------------------------
 
@@ -357,19 +279,7 @@ If supported, PMD calculates digest always on plaintext i.e.
 before compression and after decompression.
 
 Currently supported list of hash algos are SHA-1 and SHA2 family
-SHA256.
-
-.. code-block:: c
-
-	enum rte_comp_hash_algorithm {
-		RTE_COMP_HASH_ALGO_UNSPECIFIED = 0,
-		/**< No hash */
-		RTE_COMP_HASH_ALGO_SHA1,
-		/**< SHA1 hash algorithm */
-		RTE_COMP_HASH_ALGO_SHA2_256,
-		/**< SHA256 hash algorithm of SHA2 family */
-		RTE_COMP_HASH_ALGO_LIST_END
-	};
+SHA256. See *DPDK API Reference* for details.
 
 If required, application should set valid hash algo in compress
 or decompress xforms during ``rte_compressdev_stream_create()``
@@ -394,7 +304,7 @@ complete. Application can enqueue multiple stateless ops in a single burst
 and must attach priv_xform handle to such ops.
 
 priv_xform in Stateless operation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 priv_xform is PMD internally managed private data that it maintains to do stateless processing.
 priv_xforms are initialized provided a generic xform structure by an application via making call
@@ -411,36 +321,29 @@ create as many priv_xforms as it expects to have stateless operations in-flight.
 Application should call ``rte_compressdev_private_xform_create()`` and attach to stateless op before
 enqueuing them for processing and free via ``rte_compressdev_private_xform_free()`` during termination.
 
-.. code-block:: c
-
-   int __rte_experimental  rte_compressdev_private_xform_create(uint8_t dev_id,
-                                        const struct rte_comp_xform *xform,
-                                        void **private_xform);
-
-   int __rte_experimental  rte_compressdev_private_xform_free(uint8_t dev_id, void *private_xform);
-
-A pseudocode example to setup and process NUM_OPS stateless ops with each of length OP_LEN
+An example pseudocode to setup and process NUM_OPS stateless ops with each of length OP_LEN
 using shareable priv_xform would look like:
 
 .. code-block:: c
 
-	/*
-     * Pseudo code example to do stateless compression
+     /*
+     * Pseudo code to do stateless compression
      */
 
+    uint8_t cdev_id = rte_compdev_get_dev_id(<pmd name>);
 
-	/* Create  operation pool. */
-    op_pool = rte_comp_op_pool_create("comp_op_pool",
-						NUM_OPS,
-						POOL_CACHE_SIZE,
-						0,
-						socket_id);
-    if (op_pool == NULL)
-        rte_exit(EXIT_FAILURE, "Cannot create op pool\n");
+    /* configure the  device. */
+    if (rte_compressdev_configure(cdev_id, &conf) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to configure compressdev %u", cdev_id);
 
-    /* Create the virtual device. */
+    if (rte_compressdev_queue_pair_setup(cdev_id, 0, NUM_MAX_INFLIGHT_OPS,
+									socket_id()) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to setup queue pair\n");
 
-	/* Create the compress transform. */
+    if (rte_compressdev_start(cdev_id) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to start device\n");
+
+    /* setup compress transform */
     struct rte_compress_compress_xform compress_xform = {
         .next = NULL,
 		.type = RTE_COMP_COMPRESS,
@@ -456,34 +359,23 @@ using shareable priv_xform would look like:
 		}
     };
 
-    /* Create stream and initialize it for the compression device. */
-	if( priv xform shareable )
-		ret = rte_comp_priv_xform_create(cdev_id, &xform, &priv_xform);
-	else
-		non-shareable = 1;
-
-	/* Get a burst of operations. */
-    struct rte_comp_op *comp_ops[CHUNK_LEN];
-    if (rte_comp_op_bulk_alloc(op_pool, comp_ops, NUM_OPS) == 0)
-        rte_exit(EXIT_FAILURE, "Not enough compression operations available\n");
-
-    /* Get a burst of src and dst mbufs. */
-
-    /* Prepare source and destination mbufs for compression operations */
-    unsigned int i;
-    for (i = 0; i < NUM_OPS; i++) {
-        if (rte_pktmbuf_append(mbufs[i], OP_LEN) == NULL)
-            rte_exit(EXIT_FAILURE, "Not enough room in the mbuf\n");
-        comp_ops[i]->m_src = mbufs[i];
-		 if (rte_pktmbuf_append(dst_mbufs[i], OP_LEN) == NULL)
-            rte_exit(EXIT_FAILURE, "Not enough room in the mbuf\n");
-        comp_ops[i]->m_dst = dst_mbufs[i];
+    /* create priv_xform and initialize it for the compression device. */
+    void *priv_xform = NULL;
+    rte_compressdev_info_get(cdev_id, &dev_info);
+    if(dev_info.capability->comps_feature_flag & RTE_COMP_FF_SHAREABLE_PRIV_XFORM) {
+        rte_comp_priv_xform_create(cdev_id, &compress_xform, &priv_xform);        
+    }
+    else {
+            shareable = 0;
     }
 
-    /* Set up the compress operations. */
+    /* create operation pool via call to rte_comp_op_pool_create and alloc ops */
+    rte_comp_op_bulk_alloc(op_pool, comp_ops, NUM_OPS);
+      
+    /* prepare ops for compression operations */
     for (i = 0; i < NUM_OPS; i++) {
         struct rte_comp_op *op = comp_ops[i];
-		if (non-shareable)
+		if (!shareable)
 			rte_priv_xform_create(cdev_id, &compress_xform, &op->priv_xform)
 		else
 			op->priv_xform = priv_xform;
@@ -494,7 +386,8 @@ using shareable priv_xform would look like:
 		op->dst.offset = 0;
 		op->src.length = OP_LEN;
 		op->input_chksum = 0;
-	}
+		setup op->m_src and op->m_dst;
+	}	
 	num_enqd = rte_compressdev_enqueue_burst(cdev_id, 0, comp_ops, NUM_OPS);
 	/* wait for this to complete before enqueing next*/
 	do {
@@ -566,35 +459,30 @@ Application should call ``rte_comp_stream_create()`` and attach to op before
 enqueuing them for processing and free via ``rte_comp_stream_free()`` during
 termination. All ops that are to be processed statefully should carry *same* stream.
 
-.. code-block:: c
+See *DPDK API Reference* document for details.
 
-   int __rte_experimental  rte_compressdev_stream_create(uint8_t dev_id,
-	                                      const struct rte_comp_xform *xform,
-                                          void **stream);
-
-   int __rte_experimental  rte_compressdev_stream_free(uint8_t dev_id, void *stream);
-
-A pseudo code example to set up and process a stream having NUM_CHUNKS with each chunk size of CHUNK_LEN would look like:
+An example pseudocode to set up and process a stream having NUM_CHUNKS with each chunk size of CHUNK_LEN would look like:
 
 .. code-block:: c
 
-	 /*
-     * Simple example to do stateful compression
+    /*
+     * pseudocode for stateful compression
      */
 
+    uint8_t cdev_id = rte_compdev_get_dev_id(<pmd name>);
 
-	/* Create  operation pool. */
-    op_pool = rte_comp_op_pool_create("comp_op_pool",
-					NUM_CHUNKS,
-					POOL_CACHE_SIZE,
-					0,
-					socket_id);
-    if (op_pool == NULL)
-        rte_exit(EXIT_FAILURE, "Cannot create op pool\n");
+    /* configure the  device. */
+    if (rte_compressdev_configure(cdev_id, &conf) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to configure compressdev %u", cdev_id);
 
-    /* Create the virtual device. */
+    if (rte_compressdev_queue_pair_setup(cdev_id, 0, NUM_MAX_INFLIGHT_OPS,
+									socket_id()) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to setup queue pair\n");
 
-	/* Create the compress transform. */
+    if (rte_compressdev_start(cdev_id) < 0)
+        rte_exit(EXIT_FAILURE, "Failed to start device\n");
+
+    /* setup compress transform. */
     struct rte_compress_compress_xform compress_xform = {
         .next = NULL,
 		.type = RTE_COMP_COMPRESS,
@@ -610,16 +498,12 @@ A pseudo code example to set up and process a stream having NUM_CHUNKS with each
 		}
     };
 
-    /* Create stream and initialize it for the compression device. */
-	rte_comp_stream_create(cdev_id, &xform, &stream);
+    /* create stream */
+    rte_comp_stream_create(cdev_id, &compress_xform, &stream);
 
-	/* Get a burst of operations. */
-    struct rte_comp_op *comp_ops[CHUNK_LEN];
-    if (rte_comp_op_bulk_alloc(op_pool, comp_ops, CHUNK_LEN) == 0)
-        rte_exit(EXIT_FAILURE, "Not enough compression operations available\n");
-
-    /* Get a burst of src and dst mbufs. */
-
+    /* create an op pool and allocate ops */    
+    rte_comp_op_bulk_alloc(op_pool, comp_ops, NUM_CHUNKS);
+        
     /* Prepare source and destination mbufs for compression operations */
     unsigned int i;
     for (i = 0; i < NUM_CHUNKS; i++) {
@@ -633,8 +517,7 @@ A pseudo code example to set up and process a stream having NUM_CHUNKS with each
 
     /* Set up the compress operations. */
     for (i = 0; i < NUM_CHUNKS; i++) {
-        struct rte_comp_op *op = comp_ops[i];
-
+        	struct rte_comp_op *op = comp_ops[i];
 		op->stream = stream;
 		op->m_src = src_buf[i];
 		op->m_dst = dst_buf[i];
@@ -725,201 +608,17 @@ The enqueue function returns the number of operations it actually enqueued for
 processing, a return value equal to ``nb_ops`` means that all packets have been
 enqueued.
 
-.. code-block:: c
-
-   uint16_t rte_compressdev_enqueue_burst(uint8_t dev_id, uint16_t qp_id,
-						struct rte_comp_op **ops, uint16_t nb_ops)
-
 The dequeue API uses the same format as the enqueue API of processed but
 the ``nb_ops`` and ``ops`` parameters are now used to specify the max processed
 operations the user wishes to retrieve and the location in which to store them.
 The API call returns the actual number of processed operations returned, this
 can never be larger than ``nb_ops``.
 
-.. code-block:: c
-
-   uint16_t rte_compressdev_dequeue_burst(uint8_t dev_id, uint16_t qp_id,
-                                        struct rte_comp_op **ops, uint16_t nb_ops);
-
 Sample code
 -----------
 
 There are unit test applications that show how to use the compressdev library inside
 test/test/test_compressdev.c
-
-The following sample code shows the basic steps to compress several stateless buffers
-using deflate, using one of the sudo compress PMDs available in DPDK.
-
-.. code-block:: c
-
-	 /*
-     * Simple example to do stateless compression
-     */
-
-
-    #define NUM_MBUFS            1024
-    #define POOL_CACHE_SIZE      128
-    #define BURST_SIZE           32
-    #define BUFFER_SIZE          1024
-
-    struct rte_mempool *mbuf_pool, *op_pool, *session_pool;
-    unsigned int session_size;
-    int ret;
-	int shareable = 1;
-
-    /* Initialize EAL. */
-    ret = rte_eal_init(argc, argv);
-    if (ret < 0)
-        rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
-
-    uint8_t socket_id = rte_socket_id();
-
-    /* Create the mbuf pool. */
-    mbuf_pool = rte_pktmbuf_pool_create("mbuf_pool",
-                                    NUM_MBUFS*2,
-                                    POOL_CACHE_SIZE,
-                                    0,
-                                    RTE_MBUF_DEFAULT_BUF_SIZE,
-                                    socket_id);
-    if (mbuf_pool == NULL)
-        rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
-
-    /* Create  operation pool. */
-    op_pool = rte_comp_op_pool_create("comp_op_pool",
-										NUM_MBUFS,
-                                        POOL_CACHE_SIZE,
-                                        0,
-                                        socket_id);
-    if (op_pool == NULL)
-        rte_exit(EXIT_FAILURE, "Cannot create  op pool\n");
-
-    /* Create the virtual  device. */
-    char args[128];
-    const char *comp_name = "còmpress_null";
-    snprintf(args, sizeof(args), "socket_id=%d", socket_id);
-    ret = rte_vdev_init(comp_name, args);
-    if (ret != 0)
-        rte_exit(EXIT_FAILURE, "Cannot create virtual device");
-
-    uint8_t cdev_id = rte_compdev_get_dev_id(comp_name);
-
-    /* Configure the  device. */
-    struct rte_compressdev_config conf = {
-        .nb_queue_pairs = 1,
-        .socket_id = socket_id
-		.max_nb_priv_xforms = BURST_SIZE,
-		.max_nb_streams = 0
-    };
-
-    if (rte_compressdev_configure(cdev_id, &conf) < 0)
-        rte_exit(EXIT_FAILURE, "Failed to configure compressdev %u", cdev_id);
-
-    if (rte_compressdev_queue_pair_setup(cdev_id, 0, NUM_MAX_INFLIGHT_OPS,
-									socket_id()) < 0)
-        rte_exit(EXIT_FAILURE, "Failed to setup queue pair\n");
-
-    if (rte_compressdev_start(cdev_id) < 0)
-        rte_exit(EXIT_FAILURE, "Failed to start device\n");
-
-    /* Create the compress transform. */
-    struct rte_compress_compress_xform compress_xform = {
-        .next = NULL,
-		.type = RTE_COMP_COMPRESS,
-		.compress = {
-			.algo = RTE_COMP_ALGO_DEFLATE,
-			.deflate = {
-				.huffman = RTE_COMP_HUFFMAN_DEFAULT
-			},
-			.level = RTE_COMP_LEVEL_PMD_DEFAULT,
-			.chksum = RTE_COMP_CHECKSUM_NONE,
-			.window_size = DEFAULT_WINDOW_SIZE,
-			.hash_algo = RTE_COMP_HASH_ALGO_UNSPECIFIED
-		}
-    };
-
-    /* Create priv_xform and initialize it for the compression device. */
-    void *priv_xform = NULL;
-    rte_compressdev_info_get(cdev_id, &dev_info);
-    if(dev_info.capability->comps_feature_flag & RTE_COMP_FF_SHAREABLE_PRIV_XFORM) {
-        rte_comp_priv_xform_create(cdev_id, &compress_xform, &priv_xform);
-        rte_log(INFO, "using shareable priv_xform\n");
-    }
-    else {
-            rte_log(INFO, "priv_xform is non-shareable");
-            shareable = 0;
-         }
-
-    /* Get a burst of operations. */
-    struct rte_comp_op *comp_ops[BURST_SIZE];
-    if (rte_comp_op_bulk_alloc(op_pool, comp_ops, BURST_SIZE) == 0)
-        rte_exit(EXIT_FAILURE, "Not enough compression operations available\n");
-
-    /* Get a burst of mbufs. */
-    struct rte_mbuf *mbufs[BURST_SIZE];
-	struct rte_mbuf *dst_mbufs[BURST_SIZE];
-
-    if (rte_pktmbuf_alloc_bulk(mbuf_pool, mbufs, BURST_SIZE) < 0)
-        rte_exit(EXIT_FAILURE, "Not enough mbufs available");
-
-	if (rte_pktmbuf_alloc_bulk(mbuf_pool, dst_mbufs, BURST_SIZE) < 0)
-        rte_exit(EXIT_FAILURE, "Not enough mbufs available");
-
-    /* Prepare source and destination mbufs for compression operations */
-    unsigned int i;
-    for (i = 0; i < BURST_SIZE; i++) {
-        if (rte_pktmbuf_append(mbufs[i], BUFFER_SIZE) == NULL)
-            rte_exit(EXIT_FAILURE, "Not enough room in the mbuf\n");
-        comp_ops[i]->m_src = mbufs[i];
-		 if (rte_pktmbuf_append(dst_mbufs[i], BUFFER_SIZE) == NULL)
-            rte_exit(EXIT_FAILURE, "Not enough room in the mbuf\n");
-        comp_ops[i]->m_dst = dst_mbufs[i];
-    }
-
-    /* Set up the compress operations. */
-    for (i = 0; i < BURST_SIZE; i++) {
-        struct rte_comp_op *op = comp_ops[i];
-		if(i && !shareable) {
-			/* allocate separate xform for each op */
-			rte_compressdev_private_xform_create(cdev_id, &compress_xform, &op->private_xform);
-		} else {
-			/* Attach the priv_xform to the operation */
-			op->private_xform = priv_xform;
-		}
-		op->src.offset = 0;
-		op->src.length = BUFFER_SIZE;
-		op->dst.offset = 0;
-		op->type = RTE_COMP_OP_STATELESS;
-		op->flush = RTE_COMP_FLUSH_FINAL;
-		op->mempool = op_pool;
-	}
-
-    /* Enqueue the operations on device. */
-    uint16_t num_enqueued_ops = rte_compressdev_enqueue_burst(cdev_id, 0,
-                                            comp_ops, BURST_SIZE);
-
-    /*
-     * Dequeue operations until all the operations
-     * are proccessed
-     */
-    uint16_t num_dequeued_ops, total_num_dequeued_ops = 0;
-    do {
-        struct rte_comp_op *dequeued_ops[BURST_SIZE];
-        num_dequeued_ops = rte_compressdev_dequeue_burst(cdev_id, 0,
-                                        dequeued_ops, BURST_SIZE);
-        total_num_dequeued_ops += num_dequeued_ops;
-
-        /* Check if operation was processed successfully */
-        for (i = 0; i < num_dequeued_ops; i++) {
-            if (dequeued_ops[i]->status != RTE_COMP_OP_STATUS_SUCCESS)
-                rte_exit(EXIT_FAILURE,
-                        "Some operations were not processed correctly");
-            rte_comp_op_free(dequeued_ops[i]);
-        }
-
-        rte_mempool_put_bulk(op_pool, (void **)dequeued_ops,
-                                            num_dequeued_ops);
-    } while (total_num_dequeued_ops < num_enqueued_ops);
-
 
 Compression Device API
 ~~~~~~~~~~~~~~~~~~~~~~
